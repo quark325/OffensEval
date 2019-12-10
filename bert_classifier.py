@@ -120,9 +120,11 @@ class ClassificationModel:
         self.gpu = gpu
         self.task = task
         self.bert_model = bert_model
-        self.x_train, self.y_train = load_train_dataset(self.task)
-        self.x_val = np.random.choice(self.x_train, size=(int(val * len(self.x_train)),), replace=False)
-        self.y_val = np.random.choice(self.y_train, size=(int(val * len(self.x_train)),), replace=False)
+        nb_data = load_train_dataset(self.task)[0].shape[0]
+        self.x_train, self.y_train = load_train_dataset(self.task)[:nb_data * (1-val)]
+        self.x_test, self.y_test = load_train_dataset(self.task)[nb_data * (1-val):]
+        # self.x_val = np.random.choice(self.x_train, size=(int(val * len(self.x_train)),), replace=False)
+        # self.y_val = np.random.choice(self.y_train, size=(int(val * len(self.x_train)),), replace=False)
         self.x_test_ids, self.x_test = load_test_dataset(self.task)
         self.num_classes = len(TASK_LABELS[task])
 
@@ -142,10 +144,10 @@ class ClassificationModel:
     def __init_model(self):
         if self.gpu:
             self.device = torch.device("cuda")
-            print("hello I am using GPU")
+            print("Learning start with GPU")
         else:
             self.device = torch.device("cpu")
-            print("hello I am using CPU")
+            print("Learning start with CPU")
         self.model.to(self.device)
         print(torch.cuda.memory_allocated(self.device))
 
@@ -174,7 +176,6 @@ class ClassificationModel:
         self.optimizer = BertAdam(optimizer_grouped_parameters, lr=lr, warmup=0.1,
                                   t_total=int(len(self.x_train) / batch_size) * epochs)
 
-        nb_tr_steps = 0
         train_features = convert_examples_to_features(self.x_train, self.y_train, MAX_SEQ_LENGTH, self.tokenizer)
         all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
@@ -189,6 +190,7 @@ class ClassificationModel:
 
         self.model.train()
         for e in range(epochs):
+            loss_sum = 0
             print("Epoch {e}".format(e=e))
             f1, acc = self.val()
             print("\nF1 score: {f1}, Accuracy: {acc}".format(f1=f1, acc=acc))
@@ -200,16 +202,21 @@ class ClassificationModel:
 
                 loss = self.model(input_ids, segment_ids, input_mask, label_ids)
                 loss.backward()
-                self.plt_y.append(loss.item())
-                self.plt_x.append(nb_tr_steps)
-                self.save_plot(plot_path)
+                print("step and epochs and batch_size", step, e, batch_size)
+                loss_sum += loss.item()
+                # self.plt_y.append(loss.item())
+                # self.plt_x.append(nb_tr_steps)
+                # self.save_plot(plot_path)
 
-                nb_tr_steps += 1
+                # nb_tr_steps += 1
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
                 if self.gpu:
                     torch.cuda.empty_cache()
+            self.plt_x.append(e)
+            self.plt_y.append(loss_sum)
+            self.save_plot(plot_path)
 
     def val(self, batch_size=32, test=False):
         eval_features = convert_examples_to_features(self.x_val, self.y_val, MAX_SEQ_LENGTH, self.tokenizer)
