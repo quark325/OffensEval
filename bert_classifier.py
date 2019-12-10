@@ -122,7 +122,6 @@ class ClassificationModel:
         self.bert_model = bert_model
         x_total, y_total = load_train_dataset(self.task)
         nb_data = x_total.shape[0]
-        nb_data = 3
         self.x_train, self.y_train = x_total[:int(nb_data * (1-val))], y_total[:int(nb_data * (1-val))]
         self.x_val, self.y_val = x_total[int(nb_data * (1-val)):], y_total[:int(nb_data * (1-val))]
         # self.x_val = np.random.choice(self.x_train, size=(int(val * len(self.x_train)),), replace=False)
