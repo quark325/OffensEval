@@ -122,6 +122,7 @@ class ClassificationModel:
         self.bert_model = bert_model
         x_total, y_total = load_train_dataset(self.task)
         nb_data = x_total.shape[0]
+        nb_data = 3
         self.x_train, self.y_train = x_total[:int(nb_data * (1-val))], y_total[:int(nb_data * (1-val))]
         self.x_val, self.y_val = x_total[int(nb_data * (1-val)):], y_total[:int(nb_data * (1-val))]
         # self.x_val = np.random.choice(self.x_train, size=(int(val * len(self.x_train)),), replace=False)
@@ -175,7 +176,7 @@ class ClassificationModel:
             {'params': [p for n, p in model_params if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
             {'params': [p for n, p in model_params if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
         ]
-        self.optimizer = BertAdam(optimizer_grouped_parameters, lr=lr, warmup=0.1,
+        self.optimizer = BertAdam(optimizer_grouped_parameters, lr=lr, warmup=0.0,
                                   t_total=int(len(self.x_train) / batch_size) * epochs)
 
         train_features = convert_examples_to_features(self.x_train, self.y_train, MAX_SEQ_LENGTH, self.tokenizer)
@@ -207,7 +208,6 @@ class ClassificationModel:
 
                 loss = self.model(input_ids, segment_ids, input_mask, label_ids)
                 loss.backward()
-                print("step and epochs and batch_size", step, e, batch_size)
                 loss_sum += loss.item()
                 # self.plt_y.append(loss.item())
                 # self.plt_x.append(nb_tr_steps)
@@ -256,11 +256,25 @@ class ClassificationModel:
 
     def save_plot(self, path):
         import matplotlib.pyplot as plt
-        fig, ax = plt.subplots()
-        ax.plot(self.plt_x, self.plt_y, 'r')
-        ax.plot(self.plt_x, self.plt_y_val, 'g')
+        fig, axs = plt.subplots(2)
+        axs[0].plot(self.plt_x, self.plt_y, 'r')
+        axs[0].set_title('Loss')
+        axs[1].plot(self.plt_x, self.plt_y_val, 'g')
+        axs[0].set_title('val_Loss')
 
-        ax.set(xlabel='Training steps', ylabel='Loss')
+        # ax.set(xlabel='Training steps', ylabel='Loss')
+        for ax in axs.flat:
+            ax.set(xlabel='Epochs', ylabel='Loss')
+
+        # plt.subplot(2, 1, 1)
+        # plt.plot(x1, y1, 'o-')
+        # plt.title('A tale of 2 subplots')
+        # plt.ylabel('Damped oscillation')
+        #
+        # plt.subplot(2, 1, 2)
+        # plt.plot(x2, y2, '.-')
+        # plt.xlabel('time (s)')
+        # plt.ylabel('Undamped')
 
         fig.savefig(path)
         plt.close()
