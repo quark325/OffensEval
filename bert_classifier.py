@@ -121,8 +121,8 @@ class ClassificationModel:
         self.task = task
         self.bert_model = bert_model
         nb_data = load_train_dataset(self.task)[0].shape[0]
-        self.x_train, self.y_train = load_train_dataset(self.task)[:nb_data * (1-val)]
-        self.x_test, self.y_test = load_train_dataset(self.task)[nb_data * (1-val):]
+        self.x_train, self.y_train = load_train_dataset(self.task)[:int(nb_data * (1-val))]
+        self.x_test, self.y_test = load_train_dataset(self.task)[int(nb_data * (1-val)):]
         # self.x_val = np.random.choice(self.x_train, size=(int(val * len(self.x_train)),), replace=False)
         # self.y_val = np.random.choice(self.y_train, size=(int(val * len(self.x_train)),), replace=False)
         self.x_test_ids, self.x_test = load_test_dataset(self.task)
@@ -134,6 +134,7 @@ class ClassificationModel:
 
         self.plt_x = []
         self.plt_y = []
+        self.plt_y_val = []
 
         random.seed(seed)
         np.random.seed(seed)
@@ -194,6 +195,9 @@ class ClassificationModel:
             print("Epoch {e}".format(e=e))
             f1, acc = self.val()
             print("\nF1 score: {f1}, Accuracy: {acc}".format(f1=f1, acc=acc))
+            # about val loss
+            self.plt_x.append(e)
+            self.plt_y_val.append(acc)
             if model_path is not None and config_path is not None:
                 self.save_model(model_path, config_path)
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
@@ -214,7 +218,7 @@ class ClassificationModel:
 
                 if self.gpu:
                     torch.cuda.empty_cache()
-            self.plt_x.append(e)
+            # self.plt_x.append(e) already append before
             self.plt_y.append(loss_sum)
             self.save_plot(plot_path)
 
@@ -252,7 +256,8 @@ class ClassificationModel:
     def save_plot(self, path):
         import matplotlib.pyplot as plt
         fig, ax = plt.subplots()
-        ax.plot(self.plt_x, self.plt_y)
+        ax.plot(self.plt_x, self.plt_y, 'r')
+        ax.plot(self.plt_x, self.plt_y_val, 'g')
 
         ax.set(xlabel='Training steps', ylabel='Loss')
 
