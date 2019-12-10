@@ -194,6 +194,7 @@ class ClassificationModel:
         self.model.train()
         for e in range(epochs):
             loss_sum = 0
+            temp_step = 0
             print("Epoch {e}".format(e=e))
             f1, acc = self.val()
             print("\nF1 score: {f1}, Accuracy: {acc}".format(f1=f1, acc=acc))
@@ -212,7 +213,7 @@ class ClassificationModel:
                 # self.plt_y.append(loss.item())
                 # self.plt_x.append(nb_tr_steps)
                 # self.save_plot(plot_path)
-
+                temp_step += 1
                 # nb_tr_steps += 1
                 self.optimizer.step()
                 self.optimizer.zero_grad()
@@ -220,7 +221,7 @@ class ClassificationModel:
                 if self.gpu:
                     torch.cuda.empty_cache()
             # self.plt_x.append(e) already append before
-            self.plt_y.append(loss_sum)
+            self.plt_y.append(loss_sum/temp_step)
             self.save_plot(plot_path)
 
     def val(self, batch_size=32, test=False):
@@ -258,13 +259,13 @@ class ClassificationModel:
         import matplotlib.pyplot as plt
         fig, axs = plt.subplots(2)
         axs[0].plot(self.plt_x, self.plt_y, 'r')
-        axs[0].set_title('Loss')
+        axs[0].set(xlabel='Epochs', ylabel='Loss')
+
         axs[1].plot(self.plt_x, self.plt_y_val, 'g')
-        axs[0].set_title('val_Loss')
+        axs[1].set(xlabel='Epochs', ylabel='Val_Loss')
 
         # ax.set(xlabel='Training steps', ylabel='Loss')
-        for ax in axs.flat:
-            ax.set(xlabel='Epochs', ylabel='Loss')
+        # for ax in axs.flat:
 
         # plt.subplot(2, 1, 1)
         # plt.plot(x1, y1, 'o-')
