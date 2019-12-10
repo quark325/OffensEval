@@ -1,7 +1,5 @@
 import numpy as np
-import re
 import torch
-import preprocessor as p
 from pytorch_pretrained_bert import BertTokenizer, BertForSequenceClassification, BertAdam, BertConfig
 from torch.utils.data import TensorDataset, RandomSampler, DataLoader, SequentialSampler, WeightedRandomSampler
 from tqdm import tqdm
@@ -14,21 +12,33 @@ CACHE = "./models"
 BERT_MODEL = "bert-base-cased"
 MAX_SEQ_LENGTH = 180
 
-p.set_options(p.OPT.MENTION, p.OPT.EMOJI)
 
 class Task(Enum):
     A = "A"
+    B = "B"
+    C = "C"
 
 
 TASK_LABELS = {
     Task.A: {
         "NOT": 0,
         "OFF": 1
+    },
+    Task.B: {
+        "TIN": 0,
+        "UNT": 1
+    },
+    Task.C: {
+        "IND": 0,
+        "GRP": 1,
+        "OTH": 2
     }
 }
 TRAIN = "./data/olid-training-v1.0.tsv"
 TEST = {
-    Task.A: "./data/testset-levela.tsv"
+    Task.A: "./data/test_set_taska.tsv",
+    Task.B: "./data/test_set_taskb.tsv",
+    Task.C: "./data/test_set_taskc.tsv",
 }
 
 
@@ -37,17 +47,7 @@ def load_test_dataset(task):
     x = []
     with open(TEST[task], 'rt') as test:
         for inp in csv.reader(test, delimiter='\t'):
- #           print(inp[1])
-            # Delete #s
-            temp = inp[1].replace("#", "")
-            # Delete URLs
-            temp = temp.replace("URL", "")
-            # Delete mentions & emojis
-            temp = p.clean(temp)
-            # Remove repeating characters
-            temp = re.sub(r'(.)\1+', r'\1\1', temp)
-#            print(temp)
-            x.append(temp)
+            x.append(inp[1])
             ids.append(inp[0])
         return ids, x
 
@@ -59,17 +59,16 @@ def load_train_dataset(task):
         x = []
         y = []
         for i, inp in enumerate(tsvin):
-            if i != 0:
-                # Delete #s
-                temp = inp[1].replace("#", "")
-                # Delete URLs
-                temp = temp.replace("URL", "")
-                # Delete mentions & emojis
-                temp = p.clean(temp)
-                # Remove repeating characters
-                temp = re.sub(r'(.)\1+', r'\1\1', temp)
-                x.append(temp)
+            if task == Task.A:
+                x.append(inp[1])
                 y.append(TASK_LABELS[task][inp[2]])
+            elif task == Task.B and inp[3] != "NULL":
+                x.append(inp[1])
+                y.append(TASK_LABELS[task][inp[3]])
+            elif task == Task.C and inp[4] != "NULL":
+                x.append(inp[1])
+                y.append(TASK_LABELS[task][inp[4]])
+
         return np.array(x), np.array(y)
 
 
@@ -116,7 +115,7 @@ def convert_examples_to_features(x, y, max_seq_length, tokenizer):
 
 
 class ClassificationModel:
-    def __init__(self, task, val=0.1, bert_model=BERT_MODEL, gpu=True, seed=0):
+    def __init__(self, task, val=0.1, bert_model=BERT_MODEL, gpu=False, seed=0):
         self.gpu = gpu
         self.task = task
         self.bert_model = bert_model
@@ -142,10 +141,10 @@ class ClassificationModel:
     def __init_model(self):
         if self.gpu:
             self.device = torch.device("cuda")
-            print("hello I am using GPU")
+            print("Start learning with GPU")
         else:
             self.device = torch.device("cpu")
-            print("hello I am using CPU")
+            print("Start learning with CPU")
         self.model.to(self.device)
         print(torch.cuda.memory_allocated(self.device))
 
@@ -174,7 +173,6 @@ class ClassificationModel:
         self.optimizer = BertAdam(optimizer_grouped_parameters, lr=lr, warmup=0.1,
                                   t_total=int(len(self.x_train) / batch_size) * epochs)
 
-        nb_tr_steps = 0
         train_features = convert_examples_to_features(self.x_train, self.y_train, MAX_SEQ_LENGTH, self.tokenizer)
         all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
@@ -188,6 +186,8 @@ class ClassificationModel:
         train_dataloader = DataLoader(train_data, sampler=sampler, batch_size=batch_size)
 
         self.model.train()
+        temp_loss = 0
+        nb_tr_steps = 0
         for e in range(epochs):
             print("Epoch {e}".format(e=e))
             f1, acc = self.val()
@@ -200,6 +200,7 @@ class ClassificationModel:
 
                 loss = self.model(input_ids, segment_ids, input_mask, label_ids)
                 loss.backward()
+
                 self.plt_y.append(loss.item())
                 self.plt_x.append(nb_tr_steps)
                 self.save_plot(plot_path)
@@ -238,7 +239,6 @@ class ClassificationModel:
             tmp_eval_f1 = f1_score(predicted_labels, gnd_labels, average='macro')
             f1 += tmp_eval_f1 * input_ids.size(0)
             nb_eval_examples += input_ids.size(0)
-        print("nb_eval_examples : %d"%nb_eval_examples)
 
         return f1 / nb_eval_examples, acc / nb_eval_examples
 
@@ -279,20 +279,16 @@ class ClassificationModel:
         with open(path, "w") as csv_file:
             writer = csv.writer(csv_file, delimiter=',')
             for i, prediction in enumerate(predictions):
-                if i!=0:
-                    writer.writerow([int(self.x_test_ids[i]), prediction])
+                writer.writerow([int(self.x_test_ids[i]), prediction])
 
         return predictions
 
 
 if __name__ == "__main__":
-
+    PATH_CONFIG = "./results/b-uncased-4-epochs/config"
+    PATH_STATE = "./results/b-uncased-4-epochs/state"
     PLOT_PATH = "./plot.png"
-    PATH_CONFIG = "./results/a-uncased-4-epochs/config"
-    PATH_STATE = "./results/a-uncased-4-epochs/state"
 
-    cm = ClassificationModel(Task.A, gpu='cuda', seed=0, val=0.20)
-    cm.new_model()
-
-    cm.train(epochs=8, plot_path=PLOT_PATH, batch_size=32, lr=5e-04, model_path=PATH_STATE, config_path=PATH_CONFIG)
-    cm.create_test_predictions("./a_pred.csv")
+    cm = ClassificationModel(Task.C, gpu=True, seed=0, val=0.2)
+    cm.load_model(PATH_STATE, PATH_CONFIG)
+    cm.create_test_predictions("./c_pred.csv")
