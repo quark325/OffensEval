@@ -34,7 +34,7 @@ TASK_LABELS = {
         "OTH": 2
     }
 }
-TRAIN = "./data/offenseval-training-v1.tsv"
+TRAIN = "./data/olid-training-v1.0.tsv"
 TEST = {
     Task.A: "./data/test_set_taska.tsv",
     Task.B: "./data/test_set_taskb.tsv",
@@ -141,8 +141,10 @@ class ClassificationModel:
     def __init_model(self):
         if self.gpu:
             self.device = torch.device("cuda")
+            print("Start learning with GPU")
         else:
             self.device = torch.device("cpu")
+            print("Start learning with CPU")
         self.model.to(self.device)
         print(torch.cuda.memory_allocated(self.device))
 
@@ -171,7 +173,6 @@ class ClassificationModel:
         self.optimizer = BertAdam(optimizer_grouped_parameters, lr=lr, warmup=0.1,
                                   t_total=int(len(self.x_train) / batch_size) * epochs)
 
-        nb_tr_steps = 0
         train_features = convert_examples_to_features(self.x_train, self.y_train, MAX_SEQ_LENGTH, self.tokenizer)
         all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
@@ -185,6 +186,8 @@ class ClassificationModel:
         train_dataloader = DataLoader(train_data, sampler=sampler, batch_size=batch_size)
 
         self.model.train()
+        temp_loss = 0
+        nb_tr_steps = 0
         for e in range(epochs):
             print("Epoch {e}".format(e=e))
             f1, acc = self.val()
