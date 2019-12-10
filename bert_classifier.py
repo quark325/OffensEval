@@ -186,9 +186,9 @@ class ClassificationModel:
 
         self.model.train()
         for e in range(epochs):
-            print(f"Epoch {e}")
+            print("Epoch {e}".format(e=e))
             f1, acc = self.val()
-            print(f"\nF1 score: {f1}, Accuracy: {acc}")
+            print("\nF1 score: {f1}, Accuracy: {acc}".format(f1=f1, acc=acc))
             if model_path is not None and config_path is not None:
                 self.save_model(model_path, config_path)
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
@@ -286,6 +286,6 @@ if __name__ == "__main__":
     PATH_STATE = "./results/b-uncased-4-epochs/state"
     PLOT_PATH = "./plot.png"
 
-    cm = ClassificationModel(Task.C, gpu=False, seed=0, val=0.05)
+    cm = ClassificationModel(Task.C, gpu=True, seed=0, val=0.2)
     cm.load_model(PATH_STATE, PATH_CONFIG)
     cm.create_test_predictions("./c_pred.csv")
