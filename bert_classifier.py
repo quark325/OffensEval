@@ -120,9 +120,10 @@ class ClassificationModel:
         self.gpu = gpu
         self.task = task
         self.bert_model = bert_model
-        nb_data = load_train_dataset(self.task)[0].shape[0]
-        self.x_train, self.y_train = load_train_dataset(self.task)[:int(nb_data * (1-val))]
-        self.x_test, self.y_test = load_train_dataset(self.task)[int(nb_data * (1-val)):]
+        x_total, y_total = load_train_dataset(self.task)
+        nb_data = x_total.shape[0]
+        self.x_train, self.y_train = x_total[:int(nb_data * (1-val))], y_total[:int(nb_data * (1-val))]
+        self.x_test, self.y_test = x_total[int(nb_data * (1-val)):], y_total[:int(nb_data * (1-val))]
         # self.x_val = np.random.choice(self.x_train, size=(int(val * len(self.x_train)),), replace=False)
         # self.y_val = np.random.choice(self.y_train, size=(int(val * len(self.x_train)),), replace=False)
         self.x_test_ids, self.x_test = load_test_dataset(self.task)
