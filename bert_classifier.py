@@ -261,7 +261,7 @@ class ClassificationModel:
         axs[0].set(xlabel='Epochs', ylabel='Loss')
 
         axs[1].plot(self.plt_x, self.plt_y_val, 'g')
-        axs[1].set(xlabel='Epochs', ylabel='Val_Loss')
+        axs[1].set(xlabel='Epochs', ylabel='Accuracy')
 
         # ax.set(xlabel='Training steps', ylabel='Loss')
         # for ax in axs.flat:
@@ -321,5 +321,5 @@ if __name__ == "__main__":
     cm = ClassificationModel(Task.A, gpu='cuda', seed=0, val=0.20)
     cm.new_model()
 
-    cm.train(epochs=8, plot_path=PLOT_PATH, batch_size=32, lr=5e-04, model_path=PATH_STATE, config_path=PATH_CONFIG)
+    cm.train(epochs=10, plot_path=PLOT_PATH, batch_size=32, lr=5e-04, model_path=PATH_STATE, config_path=PATH_CONFIG)
     cm.create_test_predictions("./a_pred.csv")
